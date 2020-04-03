@@ -6,13 +6,14 @@
 # - карты с визуализацией реального и прогнозируемого спроса на такси в выбираемый пользователем момент времени
 # - временной ряд фактического и прогнозируемого спроса на такси в выбираемой области.
 
-# In[1]:
+# In[47]:
 
 
 import numpy as np                               
 import pandas as pd 
 
 import geopandas as gpd
+from shapely.geometry import Polygon
 
 from bokeh.io import save, show, output_file, output_notebook, reset_output, export_png
 from bokeh.plotting import figure
@@ -29,16 +30,301 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import rgb2hex
 
 from bokeh.tile_providers import Vendors, get_provider
-import pickle
+import json
 
 
-with open('f_data.pkl', 'rb') as f:
-    f_data = pickle.load(f)
+# In[2]:
 
 
-with open('f2_data.pkl', 'rb') as f:
-    f2_data = pickle.load(f)
+#output_notebook()
 
+
+# ## Read taxi orders count data
+
+# In[3]:
+
+
+df=pd.read_csv('all_data.csv',sep=';')
+
+
+# In[4]:
+
+
+df = df.set_index('time')
+
+
+# In[5]:
+
+
+df.head()
+
+
+# ### Select data for visualisation
+
+# In[6]:
+
+
+df = df.loc['2016-06-01 00':'2016-06-03 00']
+
+
+# In[7]:
+
+
+df.columns = df.columns.astype(int)
+
+
+# In[8]:
+
+
+df_cols = df.columns.tolist()
+
+
+# ### Create full 2500 regions grid
+
+# In[9]:
+
+
+full_df=pd.DataFrame(index=df.index, columns=np.arange(1, 2501))
+
+
+# In[10]:
+
+
+for x in df_cols:
+    full_df[x] = df[x]
+
+
+# In[11]:
+
+
+full_df.fillna(0, inplace=True)
+
+
+# In[12]:
+
+
+full_df.reset_index(inplace=True)
+
+
+# In[13]:
+
+
+full_df.head()
+
+
+# In[14]:
+
+
+# expand data
+data = pd.DataFrame(columns=['region', 'time','val'])
+for i in range(1, len(full_df.columns)):
+    dt_temp = pd.DataFrame(columns=['region', 'time','val'])
+    dt_temp['time'] = full_df.time.values
+    dt_temp['val'] = full_df[full_df.columns[i]].values
+    dt_temp['region'] = [full_df.columns[i]] * full_df.shape[0]
+    
+    data = data.append(dt_temp)
+
+
+# In[15]:
+
+
+data.info()
+
+
+# In[16]:
+
+
+data['time'] = data['time'].str.replace(':00:00','')
+
+
+# In[17]:
+
+
+data
+
+
+# ### Load forecasted data from week 6
+
+# In[21]:
+
+
+forecast = pd.read_csv('forecast_final_w6.csv')
+
+
+# In[22]:
+
+
+forecast.head(2)
+
+
+# In[23]:
+
+
+forecast['y'] = forecast['y'].astype(int)
+
+
+# In[24]:
+
+
+forecast["region"] = forecast["id"].apply(lambda x: x[0:4]).astype(int)
+
+
+# In[25]:
+
+
+forecast["time"] = forecast["id"].apply(lambda x: x[5:18]).astype(str)
+
+
+# In[26]:
+
+
+forecast["f_time"] = forecast["id"].apply(lambda x: x[-1:]).astype(str)
+
+
+# In[27]:
+
+
+t1 = ['_0_', '_1_', '_2_', '_3_', '_4_', '_5_', '_6_', '_7_', '_8_', '_9_', '_10', '_11','_12','_13','_14','_15','_16','_17','_18','_19','_20','_21','_22','_23']
+t2 = [' 00', ' 01', ' 02', ' 03', ' 04', ' 05', ' 06', ' 07', ' 08', ' 09', ' 10', ' 11', ' 12', ' 13', ' 14', ' 15', ' 16', ' 17', ' 18', ' 19', ' 20', ' 21', ' 22', ' 23']
+
+for o, n in zip(t1, t2):
+    forecast['time'] = forecast['time'].str.replace(o, n)
+
+
+# In[28]:
+
+
+forecast.drop(columns=['id'], inplace=True)
+
+
+# In[29]:
+
+
+forecast = forecast.rename(columns={'y': 'val'})
+
+
+# In[30]:
+
+
+regions = pd.read_csv('regions.csv', delimiter=';')
+
+
+# In[31]:
+
+
+regions.head()
+
+
+# ### Converting Coordinate Reference Systems to epsg3857-web-mercator
+
+# In[32]:
+
+
+#def lon_to_web_mercator(lon):
+#    k = 6378137
+#    return lon * (k * np.pi / 180.0)
+
+#def lat_to_web_mercator(lat):
+#    k = 6378137
+#    return np.log(np.tan((90 + lat) * np.pi / 360.0)) * k- 
+
+
+# In[33]:
+
+
+regions['west'] = regions['west'] * (6378137 * np.pi / 180.0)
+regions['east'] = regions['east'] * (6378137 * np.pi / 180.0)
+regions['south'] = np.log(np.tan((90 + regions['south']) * np.pi / 360.0)) * 6378137
+regions['north'] = np.log(np.tan((90 + regions['north']) * np.pi / 360.0)) * 6378137
+
+
+# ### Calculate grid coordinates and create geopandas Polygons
+
+# In[34]:
+
+
+ul = list(zip(regions.west, regions.north))
+ur = list(zip(regions.east, regions.north))
+lr = list(zip(regions.east, regions.south))
+ll = list(zip(regions.west, regions.south))
+
+
+# In[35]:
+
+
+geom=[]
+for i in range(regions.shape[0]):
+    poly = [ul[i], ur[i], lr[i], ll[i], ul[i]]
+    geom.append(Polygon(poly))
+
+
+# In[36]:
+
+
+regions['geometry'] = geom
+
+
+# In[37]:
+
+
+regions.head()
+
+
+# ### Merge regions coordinates with real data
+
+# In[38]:
+
+
+f_data = pd.merge(data, regions, on='region')
+
+
+# In[39]:
+
+
+f_data.drop(columns=['west', 'east', 'south', 'north'], inplace=True)
+
+
+# In[40]:
+
+
+f_data.head()
+
+
+# ### Merge regions coordinates with forecasted data
+
+# In[41]:
+
+
+f2_data = pd.merge(forecast, regions, on='region')
+
+
+# In[42]:
+
+
+f2_data.drop(columns=['west', 'east', 'south', 'north'], inplace=True)
+
+
+# In[43]:
+
+
+f2_data.head()
+
+
+# In[45]:
+
+
+#import pickle
+#data.to_pickle('f_data.pkl')
+#data.to_pickle('f2_data.pkl')
+
+
+# In[ ]:
+
+
+#with open('exp_data.pkl', 'rb') as f:
+#    data = pickle.load(f)
+#data = pickle.load('exp_data.pkl')
 
 
 # ### Create GeoDataFrames
@@ -152,7 +438,7 @@ g_df.head(2)
 
 
 # create color palette for the graph
-zones = sorted(f2_data.region.unique())
+zones = sorted(df.columns.unique())
 n_zones = len(zones)
 print("%d zones to plot" % n_zones)
 cmap = plt.get_cmap('gist_ncar', n_zones)
