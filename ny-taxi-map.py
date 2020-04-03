@@ -451,8 +451,8 @@ country_palette = [rgb2hex(cmap(i)[:3]) for i in range(cmap.N)]
 
 
 # define the output file
-reset_output()
-output_file("taxi-orders.html", title="NY Taxi orders", mode="inline")
+#reset_output()
+#output_file("taxi-orders.html", title="NY Taxi orders", mode="inline")
 
 
 # In[58]:
