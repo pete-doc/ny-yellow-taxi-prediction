@@ -797,19 +797,10 @@ tabs = Tabs(tabs=[ tab_map, tab_map2, tab_chart ])
 
 
 # save the document and display it !
-footer = Div(text="""
-Вверху 3 вкладки: 1. Карта - реальные данные. 2. Карта - прогноз. 3 - График реальных данных и прогноза.</br>
-Данные представлены в диапазоне с 2016-06-01 00 по 2016-06-03 00 (Y-M-D H).</br>
-Чтобы посмотреть данные за определенную дату, нужно ввести в поле в формате 2016-06-13 01 и кликнуть Show.</br>
-На вкладке прогнозы при наведении указателя на область появляются прогнозы на 1-6 часов.</br>
-На вкладке графики представлены графики для некоторых регионов. Включить/выключить график можно кнопкой слева (прогнозируемые данные) и справа (реальные данные). Прогноз представлен на 1 час вперед.</br>
-Data: NY Yellow Taxi trip data</br>
-<a href="https://www1.nyc.gov/site/tlc/about/tlc-trip-record-data.page">NYC Taxi and Limousine Commission (TLC)</a></br >
-Author: Petr Rubin
-""")
-layout = column(tabs, footer)
 
-curdoc().add_root(layout)
+#layout = column(tabs, footer)
+
+curdoc().add_root(tabs)
 # In[72]:
 
 
