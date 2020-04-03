@@ -16,7 +16,7 @@ import geopandas as gpd
 from shapely.geometry import Polygon
 
 from bokeh.io import save, show, output_file, output_notebook, reset_output, export_png
-from bokeh.plotting import figure
+from bokeh.plotting import figure, curdoc
 from bokeh.models import (
     GeoJSONDataSource, ColumnDataSource, ColorBar, Slider, Spacer,
     HoverTool, TapTool, Panel, Tabs, Legend, Toggle, LegendItem, Button, TextInput
@@ -809,11 +809,11 @@ Author: Petr Rubin
 """)
 layout = column(tabs, footer)
 
-
+curdoc().add_root(layout)
 # In[72]:
 
 
-show(layout)
+#show(layout)
 
 
 # In[ ]:
